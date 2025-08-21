@@ -36,4 +36,12 @@ fi
 echo "Loading initial values into the database..."
 psql -U postgres -h "$CHAI_DATABASE_URL" -d chai -f load-values.sql -a
 
+# Fetch and load SPDX licenses
+echo "Fetching and loading SPDX licenses..."
+if python fetch_spdx_licenses.py | psql -U postgres -h "$CHAI_DATABASE_URL" -d chai -a; then
+    echo "SPDX licenses loaded successfully"
+else
+    echo "Warning: SPDX license loading failed, but continuing with migration"
+fi
+
 echo "Database setup and initialization complete"

@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -158,6 +159,7 @@ class License(Base):
         server_default=func.uuid_generate_v4(),
     )
     name = Column(String, nullable=False, unique=True, index=True)
+    text = Column(Text, nullable=True)
     created_at = Column(
         DateTime, nullable=False, default=func.now(), server_default=func.now()
     )
