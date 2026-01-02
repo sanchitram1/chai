@@ -136,7 +136,9 @@ class TestNormalizePkgxPackage:
 
         assert result.identifier == "myapp.io"
         assert len(result.dependencies) == 2
-        assert all(d.dependency_type == DependencyType.RUNTIME for d in result.dependencies)
+        assert all(
+            d.dependency_type == DependencyType.RUNTIME for d in result.dependencies
+        )
 
     def test_package_with_build_deps(self, basic_distributable, basic_version):
         """Package with build dependencies normalized correctly."""

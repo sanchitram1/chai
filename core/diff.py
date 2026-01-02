@@ -173,9 +173,7 @@ def diff_dependencies(
 
     package = cache.package_map.get(normalized_pkg.identifier)
     if not package:
-        logger.debug(
-            f"Package {normalized_pkg.identifier} not in cache, skipping deps"
-        )
+        logger.debug(f"Package {normalized_pkg.identifier} not in cache, skipping deps")
         return [], []
 
     pkg_id: UUID = package.id
@@ -224,7 +222,10 @@ def diff_dependencies(
             removed_deps.append(existing_dep)
         except StopIteration as exc:
             cache_deps_str = "\n".join(
-                [f"{dep.dependency_id} / {dep.dependency_type_id}" for dep in cache_deps]
+                [
+                    f"{dep.dependency_id} / {dep.dependency_type_id}"
+                    for dep in cache_deps
+                ]
             )
             raise ValueError(
                 f"Removing {removed_dep_id} / {removed_type_id} for {pkg_id} "

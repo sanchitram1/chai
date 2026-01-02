@@ -1,3 +1,4 @@
+from package_managers.pkgx.transformer import Cache
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -8,7 +9,6 @@ from core.models import (
     Package,
 )
 from package_managers.pkgx.parser import DependencyBlock
-from package_managers.pkgx.transformer import Cache
 
 BATCH_SIZE = 10000
 

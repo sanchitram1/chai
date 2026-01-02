@@ -2,8 +2,6 @@
 Tests for the homebrew normalizer.
 """
 
-import pytest
-
 from core.diff import DependencyType
 from package_managers.homebrew.normalizer import (
     extract_dependencies_from_list,
@@ -102,7 +100,9 @@ class TestNormalizeHomebrewPackage:
 
         assert result.identifier == "wget"
         assert len(result.dependencies) == 3
-        assert all(d.dependency_type == DependencyType.RUNTIME for d in result.dependencies)
+        assert all(
+            d.dependency_type == DependencyType.RUNTIME for d in result.dependencies
+        )
 
     def test_package_with_all_dependency_types(self):
         """Package with all five dependency types."""
@@ -151,8 +151,14 @@ class TestNormalizeHomebrewPackage:
         result = normalize_homebrew_package(pkg)
 
         assert len(result.dependencies) == 5
-        runtime_deps = [d for d in result.dependencies if d.dependency_type == DependencyType.RUNTIME]
-        build_deps = [d for d in result.dependencies if d.dependency_type == DependencyType.BUILD]
+        runtime_deps = [
+            d
+            for d in result.dependencies
+            if d.dependency_type == DependencyType.RUNTIME
+        ]
+        build_deps = [
+            d for d in result.dependencies if d.dependency_type == DependencyType.BUILD
+        ]
         assert len(runtime_deps) == 2
         assert len(build_deps) == 3
 

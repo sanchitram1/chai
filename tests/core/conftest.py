@@ -7,9 +7,9 @@ from uuid import uuid4
 
 import pytest
 
-from core.models import LegacyDependency, Package
-from core.structs import Cache
 from core.diff import DependencyType, NormalizedPackage, ParsedDependency
+from core.models import Package
+from core.structs import Cache
 
 
 @pytest.fixture

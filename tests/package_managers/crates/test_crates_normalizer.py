@@ -2,8 +2,6 @@
 Tests for the crates normalizer.
 """
 
-import pytest
-
 from core.diff import DependencyType
 from package_managers.crates.normalizer import (
     map_crates_dependency_type,
@@ -13,6 +11,8 @@ from package_managers.crates.structs import (
     Crate,
     CrateDependency,
     CrateLatestVersion,
+)
+from package_managers.crates.structs import (
     DependencyType as CratesDependencyType,
 )
 
@@ -22,19 +22,31 @@ class TestMapCratesDependencyType:
 
     def test_normal_maps_to_runtime(self):
         """NORMAL (runtime) dependencies map to RUNTIME."""
-        assert map_crates_dependency_type(CratesDependencyType.NORMAL) == DependencyType.RUNTIME
+        assert (
+            map_crates_dependency_type(CratesDependencyType.NORMAL)
+            == DependencyType.RUNTIME
+        )
 
     def test_build_maps_to_build(self):
         """BUILD dependencies map to BUILD."""
-        assert map_crates_dependency_type(CratesDependencyType.BUILD) == DependencyType.BUILD
+        assert (
+            map_crates_dependency_type(CratesDependencyType.BUILD)
+            == DependencyType.BUILD
+        )
 
     def test_dev_maps_to_development(self):
         """DEV dependencies map to DEVELOPMENT."""
-        assert map_crates_dependency_type(CratesDependencyType.DEV) == DependencyType.DEVELOPMENT
+        assert (
+            map_crates_dependency_type(CratesDependencyType.DEV)
+            == DependencyType.DEVELOPMENT
+        )
 
     def test_optional_maps_to_optional(self):
         """OPTIONAL dependencies map to OPTIONAL."""
-        assert map_crates_dependency_type(CratesDependencyType.OPTIONAL) == DependencyType.OPTIONAL
+        assert (
+            map_crates_dependency_type(CratesDependencyType.OPTIONAL)
+            == DependencyType.OPTIONAL
+        )
 
 
 class TestNormalizeCratesPackage:

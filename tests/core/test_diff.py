@@ -4,8 +4,6 @@ Tests for the shared dependency diffing logic in core/diff.py.
 These tests verify the core algorithm independently of any package manager.
 """
 
-from datetime import datetime
-
 import pytest
 
 from core.diff import (
@@ -25,11 +23,26 @@ class TestDependencyType:
 
     def test_priority_order(self):
         """Verify RUNTIME has highest priority (lowest number)."""
-        assert DEPENDENCY_PRIORITY[DependencyType.RUNTIME] < DEPENDENCY_PRIORITY[DependencyType.BUILD]
-        assert DEPENDENCY_PRIORITY[DependencyType.BUILD] < DEPENDENCY_PRIORITY[DependencyType.TEST]
-        assert DEPENDENCY_PRIORITY[DependencyType.TEST] < DEPENDENCY_PRIORITY[DependencyType.DEVELOPMENT]
-        assert DEPENDENCY_PRIORITY[DependencyType.DEVELOPMENT] < DEPENDENCY_PRIORITY[DependencyType.OPTIONAL]
-        assert DEPENDENCY_PRIORITY[DependencyType.OPTIONAL] < DEPENDENCY_PRIORITY[DependencyType.RECOMMENDED]
+        assert (
+            DEPENDENCY_PRIORITY[DependencyType.RUNTIME]
+            < DEPENDENCY_PRIORITY[DependencyType.BUILD]
+        )
+        assert (
+            DEPENDENCY_PRIORITY[DependencyType.BUILD]
+            < DEPENDENCY_PRIORITY[DependencyType.TEST]
+        )
+        assert (
+            DEPENDENCY_PRIORITY[DependencyType.TEST]
+            < DEPENDENCY_PRIORITY[DependencyType.DEVELOPMENT]
+        )
+        assert (
+            DEPENDENCY_PRIORITY[DependencyType.DEVELOPMENT]
+            < DEPENDENCY_PRIORITY[DependencyType.OPTIONAL]
+        )
+        assert (
+            DEPENDENCY_PRIORITY[DependencyType.OPTIONAL]
+            < DEPENDENCY_PRIORITY[DependencyType.RECOMMENDED]
+        )
 
     def test_all_types_have_priority(self):
         """Ensure all DependencyType values have a priority defined."""
@@ -121,7 +134,9 @@ class TestDeduplicateDependencies:
             ParsedDependency(name="x", dependency_type=DependencyType.TEST),
             ParsedDependency(name="x", dependency_type=DependencyType.RUNTIME),
         ]
-        assert deduplicate_dependencies(deps_runtime_first)["x"] == DependencyType.RUNTIME
+        assert (
+            deduplicate_dependencies(deps_runtime_first)["x"] == DependencyType.RUNTIME
+        )
         assert deduplicate_dependencies(deps_test_first)["x"] == DependencyType.RUNTIME
 
     def test_multiple_duplicates(self):
@@ -155,19 +170,47 @@ class TestResolveDependencyTypeId:
 
     def test_all_types_resolve(self, mock_dependency_types):
         """All DependencyType values can be resolved."""
-        assert resolve_dependency_type_id(DependencyType.RUNTIME, mock_dependency_types) == mock_dependency_types.runtime
-        assert resolve_dependency_type_id(DependencyType.BUILD, mock_dependency_types) == mock_dependency_types.build
-        assert resolve_dependency_type_id(DependencyType.TEST, mock_dependency_types) == mock_dependency_types.test
-        assert resolve_dependency_type_id(DependencyType.DEVELOPMENT, mock_dependency_types) == mock_dependency_types.development
-        assert resolve_dependency_type_id(DependencyType.OPTIONAL, mock_dependency_types) == mock_dependency_types.optional
-        assert resolve_dependency_type_id(DependencyType.RECOMMENDED, mock_dependency_types) == mock_dependency_types.recommended
+        assert (
+            resolve_dependency_type_id(DependencyType.RUNTIME, mock_dependency_types)
+            == mock_dependency_types.runtime
+        )
+        assert (
+            resolve_dependency_type_id(DependencyType.BUILD, mock_dependency_types)
+            == mock_dependency_types.build
+        )
+        assert (
+            resolve_dependency_type_id(DependencyType.TEST, mock_dependency_types)
+            == mock_dependency_types.test
+        )
+        assert (
+            resolve_dependency_type_id(
+                DependencyType.DEVELOPMENT, mock_dependency_types
+            )
+            == mock_dependency_types.development
+        )
+        assert (
+            resolve_dependency_type_id(DependencyType.OPTIONAL, mock_dependency_types)
+            == mock_dependency_types.optional
+        )
+        assert (
+            resolve_dependency_type_id(
+                DependencyType.RECOMMENDED, mock_dependency_types
+            )
+            == mock_dependency_types.recommended
+        )
 
 
 class TestDiffDependencies:
     """Tests for the main diff_dependencies function."""
 
     def test_new_dependency(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """New dependency is detected when not in cache."""
         cache = cache_factory(dependencies={})
@@ -186,7 +229,13 @@ class TestDiffDependencies:
         assert new_deps[0].dependency_type_id == mock_dependency_types.runtime
 
     def test_existing_dependency_no_change(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Existing dependency with same type produces no changes."""
         existing_dep = LegacyDependency(
@@ -210,7 +259,13 @@ class TestDiffDependencies:
         assert len(removed_deps) == 0
 
     def test_removed_dependency(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Dependency in cache but not in normalized is marked removed."""
         existing_dep = LegacyDependency(
@@ -233,7 +288,13 @@ class TestDiffDependencies:
         assert removed_deps[0].dependency_id == package_ids["dep_a"]
 
     def test_dependency_type_changed(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Changing dependency type shows as remove + add."""
         existing_dep = LegacyDependency(
@@ -259,7 +320,13 @@ class TestDiffDependencies:
         assert removed_deps[0].dependency_type_id == mock_dependency_types.build
 
     def test_multiple_deps_with_same_name_deduped(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Duplicate deps (same name, different types) are deduplicated."""
         cache = cache_factory(dependencies={})
@@ -271,7 +338,7 @@ class TestDiffDependencies:
             ],
         )
 
-        new_deps, removed_deps = diff_dependencies(
+        new_deps, _ = diff_dependencies(
             normalized, cache, mock_dependency_types, now=fixed_now
         )
 
@@ -279,7 +346,11 @@ class TestDiffDependencies:
         assert new_deps[0].dependency_type_id == mock_dependency_types.runtime
 
     def test_package_not_in_cache(
-        self, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Package not in cache returns empty lists."""
         cache = cache_factory(package_map={})
@@ -305,7 +376,9 @@ class TestDiffDependencies:
         normalized = NormalizedPackage(
             identifier="main_pkg",
             dependencies=[
-                ParsedDependency(name="unknown_dep", dependency_type=DependencyType.RUNTIME),
+                ParsedDependency(
+                    name="unknown_dep", dependency_type=DependencyType.RUNTIME
+                ),
             ],
         )
 
@@ -317,7 +390,13 @@ class TestDiffDependencies:
         assert len(removed_deps) == 0
 
     def test_multiple_new_deps(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Multiple new dependencies are all detected."""
         cache = cache_factory(dependencies={})
@@ -337,10 +416,20 @@ class TestDiffDependencies:
         assert len(new_deps) == 3
         assert len(removed_deps) == 0
         dep_ids = {d.dependency_id for d in new_deps}
-        assert dep_ids == {package_ids["dep_a"], package_ids["dep_b"], package_ids["dep_c"]}
+        assert dep_ids == {
+            package_ids["dep_a"],
+            package_ids["dep_b"],
+            package_ids["dep_c"],
+        }
 
     def test_mixed_add_remove_keep(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """Complex scenario with adds, removes, and unchanged deps."""
         existing_a = LegacyDependency(
@@ -381,7 +470,13 @@ class TestDiffDependencies:
         assert removed_deps[0].dependency_id == package_ids["dep_b"]
 
     def test_timestamps_set_correctly(
-        self, packages, package_ids, cache_factory, normalized_package_factory, mock_dependency_types, fixed_now
+        self,
+        packages,
+        package_ids,
+        cache_factory,
+        normalized_package_factory,
+        mock_dependency_types,
+        fixed_now,
     ):
         """New deps have correct timestamps."""
         cache = cache_factory(dependencies={})
