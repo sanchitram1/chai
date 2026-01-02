@@ -34,7 +34,10 @@ chai/
 
 ```bash
 # Sync all dependencies (indexers + ranker + dev tools)
-uv sync --group indexers --all-extras --group ranker
+uv sync --all-groups
+
+# Install the package in editable mode (required for imports to work)
+uv pip install -e .
 ```
 
 ### Running Tests
