@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -uo pipefail
+set -xuo pipefail
 
 # This script sets up the database, runs migrations, and loads initial values
 
