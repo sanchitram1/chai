@@ -7,3 +7,4 @@ dependencies:
   docker.com/compose: ^2
   alembic.sqlalchemy.org: ^1
   psycopg.org/psycopg2: ^2
+  python.org: ^3.11
