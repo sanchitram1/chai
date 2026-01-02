@@ -80,3 +80,10 @@ indexers = [
     "urllib3>=2.4.0",
 ]
 ranker = ["numpy>=2.3.0", "rustworkx>=0.16.0"]
+
+[tool.setuptools]
+packages = [
+    "core",
+    "package_managers",
+    "ranker"
+]
