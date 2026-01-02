@@ -2,8 +2,6 @@
 Tests for the debian normalizer.
 """
 
-import pytest
-
 from core.diff import DependencyType
 from package_managers.debian.normalizer import (
     extract_dependencies_from_depends,
@@ -98,7 +96,9 @@ class TestNormalizeDebianPackage:
 
         assert result.identifier == "debian/curl"
         assert len(result.dependencies) == 2
-        assert all(d.dependency_type == DependencyType.RUNTIME for d in result.dependencies)
+        assert all(
+            d.dependency_type == DependencyType.RUNTIME for d in result.dependencies
+        )
 
     def test_package_with_build_deps(self):
         """Package with build_depends (build) dependencies."""
@@ -114,7 +114,9 @@ class TestNormalizeDebianPackage:
         result = normalize_debian_package("debian/buildpkg", data)
 
         assert len(result.dependencies) == 2
-        assert all(d.dependency_type == DependencyType.BUILD for d in result.dependencies)
+        assert all(
+            d.dependency_type == DependencyType.BUILD for d in result.dependencies
+        )
 
     def test_recommends_maps_to_runtime(self):
         """Recommends dependencies map to RUNTIME (per existing behavior)."""
