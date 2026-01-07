@@ -107,12 +107,9 @@ class DB:
             # Also fetch packages that have NO dependencies yet (first-run case).
             # These would be missing from the outer join result above.
             packages_in_map = {pkg.id for pkg in package_map.values()}
-            stmt_no_deps = (
-                select(Package)
-                .where(
-                    (Package.package_manager_id == package_manager_id)
-                    & (Package.id.notin_(packages_in_map))
-                )
+            stmt_no_deps = select(Package).where(
+                (Package.package_manager_id == package_manager_id)
+                & (Package.id.notin_(packages_in_map))
             )
             result_no_deps: Result[tuple[Package]] = session.execute(stmt_no_deps)
             for (pkg,) in result_no_deps:
