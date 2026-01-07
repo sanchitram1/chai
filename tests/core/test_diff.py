@@ -16,6 +16,7 @@ from core.diff import (
     resolve_dependency_type_id,
 )
 from core.models import LegacyDependency
+from core.structs import Cache
 
 
 class TestDependencyType:
@@ -490,3 +491,50 @@ class TestDiffDependencies:
 
         assert new_deps[0].created_at == fixed_now
         assert new_deps[0].updated_at == fixed_now
+
+    def test_first_run_with_new_dependencies(
+        self,
+        packages,
+        package_ids,
+        mock_dependency_types,
+        fixed_now,
+    ):
+        """
+        First run scenario: all packages in cache, all dependencies are new.
+
+        This simulates the corrected behavior where the cache is properly
+        pre-populated with all packages (including those with no existing
+        dependencies). Dependencies that reference packages in the cache
+        should be recorded, even on the first run.
+        """
+        # Simulate first-run scenario: all packages exist, but no dependencies yet
+        cache = Cache(
+            package_map={
+                "main_pkg": packages["main"],
+                "dep_a": packages["dep_a"],
+                "dep_b": packages["dep_b"],
+            },
+            url_map={},
+            package_urls={},
+            dependencies={},  # Empty: no existing dependencies yet
+        )
+
+        normalized = NormalizedPackage(
+            identifier="main_pkg",
+            dependencies=[
+                ParsedDependency(name="dep_a", dependency_type=DependencyType.RUNTIME),
+                ParsedDependency(name="dep_b", dependency_type=DependencyType.BUILD),
+            ],
+        )
+
+        new_deps, removed_deps = diff_dependencies(
+            normalized, cache, mock_dependency_types, now=fixed_now
+        )
+
+        # Now that cache is properly populated, all dependencies should be detected
+        assert len(new_deps) == 2
+        assert len(removed_deps) == 0
+        assert {d.dependency_id for d in new_deps} == {
+            package_ids["dep_a"],
+            package_ids["dep_b"],
+        }
