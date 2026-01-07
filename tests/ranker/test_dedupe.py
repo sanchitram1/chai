@@ -172,9 +172,9 @@ class TestDedupe:
         assert len(updated_canon_packages) == 0, "Should not update any mappings"
 
         created_canon = new_canons[0]
-        assert (
-            created_canon.url_id == ids["url1"]
-        ), "Canon should reference correct URL ID"
+        assert created_canon.url_id == ids["url1"], (
+            "Canon should reference correct URL ID"
+        )
         assert created_canon.name == "package1", "Canon name should be the package name"
 
         # Verify mapping creation
@@ -231,20 +231,20 @@ class TestDedupe:
         assert len(updated_canon_packages) == 1, "Should update exactly one mapping"
 
         created_canon = new_canons[0]
-        assert (
-            created_canon.url_id == ids["url1"]
-        ), "Canon should reference correct URL ID"
+        assert created_canon.url_id == ids["url1"], (
+            "Canon should reference correct URL ID"
+        )
         assert created_canon.name == "package1", "Canon name should be the package name"
 
         # Verify mapping update (should point to NEW canon, not old one)
         updated_mapping = updated_canon_packages[0]
         assert "id" in updated_mapping, "Update should include canon package ID"
-        assert (
-            updated_mapping["canon_id"] == created_canon.id
-        ), "Should update to NEW canon"
-        assert (
-            updated_mapping["canon_id"] != ids["canon2"]
-        ), "Should NOT point to old canon"
+        assert updated_mapping["canon_id"] == created_canon.id, (
+            "Should update to NEW canon"
+        )
+        assert updated_mapping["canon_id"] != ids["canon2"], (
+            "Should NOT point to old canon"
+        )
         assert "updated_at" in updated_mapping, "Update should include timestamp"
 
     def test_no_changes_needed(
@@ -357,12 +357,12 @@ class TestDedupe:
         # Verify mapping update points to correct canon
         updated_mapping = updated_canon_packages[0]
         assert "id" in updated_mapping, "Update should include canon package ID"
-        assert (
-            updated_mapping["canon_id"] == ids["canon1"]
-        ), "Should update to correct canon"
-        assert (
-            updated_mapping["canon_id"] != ids["canon2"]
-        ), "Should NOT point to wrong canon"
+        assert updated_mapping["canon_id"] == ids["canon1"], (
+            "Should update to correct canon"
+        )
+        assert updated_mapping["canon_id"] != ids["canon2"], (
+            "Should NOT point to wrong canon"
+        )
         assert "updated_at" in updated_mapping, "Update should include timestamp"
 
     def test_create_new_mapping(
@@ -471,9 +471,9 @@ class TestDedupe:
         # Verify both packages map to the same canon
         canon_ids = {mapping.canon_id for mapping in new_canon_packages}
         assert len(canon_ids) == 1, "Both packages should map to same canon"
-        assert (
-            canon_ids.pop() == created_canon.id
-        ), "Both should map to the created canon"
+        assert canon_ids.pop() == created_canon.id, (
+            "Both should map to the created canon"
+        )
 
         # Verify package IDs
         package_ids = {mapping.package_id for mapping in new_canon_packages}
@@ -536,9 +536,9 @@ class TestDedupe:
         # Should not create any canons or mappings for empty URLs
         assert len(new_canons) == 0, "Should not create any canons for empty URLs"
         assert len(updated_canons) == 0, "Should not update any canons"
-        assert (
-            len(new_canon_packages) == 0
-        ), "Should not create any mappings for empty URLs"
+        assert len(new_canon_packages) == 0, (
+            "Should not create any mappings for empty URLs"
+        )
         assert len(updated_canon_packages) == 0, "Should not update any mappings"
 
     def test_canon_name_update_when_url_changes(
@@ -606,9 +606,9 @@ class TestDedupe:
         updated_canon = updated_canons[0]
         assert "id" in updated_canon, "Update should include canon ID"
         assert updated_canon["id"] == ids["canon1"], "Should update correct canon"
-        assert (
-            updated_canon["name"] == "github.com/example/new-repo"
-        ), "Should update name to new URL"
+        assert updated_canon["name"] == "github.com/example/new-repo", (
+            "Should update name to new URL"
+        )
         assert "updated_at" in updated_canon, "Update should include timestamp"
 
     def test_canon_update_with_multiple_packages(
@@ -679,9 +679,9 @@ class TestDedupe:
         # Verify canon update
         updated_canon = updated_canons[0]
         assert updated_canon["id"] == ids["canon1"], "Should update correct canon"
-        assert (
-            updated_canon["name"] == "github.com/example/updated-repo"
-        ), "Should update name to new URL"
+        assert updated_canon["name"] == "github.com/example/updated-repo", (
+            "Should update name to new URL"
+        )
 
     def test_skip_when_load_disabled(self, mock_dedupe_config, mock_db):
         """

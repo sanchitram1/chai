@@ -2,9 +2,11 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.config import Config
+from core.diff import diff_dependencies
 from core.logger import Logger
 from core.models import URL, LegacyDependency, Package, PackageURL
 from core.structs import Cache, URLKey
+from package_managers.homebrew.normalizer import normalize_homebrew_package
 from package_managers.homebrew.structs import Actual
 
 
@@ -156,112 +158,20 @@ class Diff:
         self, pkg: Actual
     ) -> tuple[list[LegacyDependency], list[LegacyDependency]]:
         """
-        Takes in a Homebrew formula and figures out what dependencies have changed. Also
-        uses the LegacyDependency table, because that is package to package.
+        Takes in a Homebrew formula and figures out what dependencies have changed.
 
-        Warnings:
-          - Updates show up as removed + new
-          - This is Homebrew specific, since LegacyDependency mandates uniqueness
-            from package_id -> dependency_id, but Homebrew allows duplicate
-            dependencies across multiple dependency types. So we've got a process helper
-            that handles this.
+        Uses the normalized dependency diffing approach:
+        1. Normalize the formula to a NormalizedPackage
+        2. Use shared diff_dependencies() for the core algorithm
 
         Returns:
           - new_deps: a list of new dependencies
           - removed_deps: a list of removed dependencies
         """
-        new_deps: list[LegacyDependency] = []
-        removed_deps: list[LegacyDependency] = []
-
-        # serialize the actual dependencies into a set of tuples
-        actual: set[tuple[UUID, UUID]] = set()
-        processed: set[str] = set()
-
-        def process(dep_names: list[str] | None, dep_type: UUID) -> None:
-            """Helper to process dependencies of a given type"""
-            # guard: no dependencies
-            if not dep_names:
-                return
-
-            for name in dep_names:
-                # guard: no dependency name / empty name
-                if not name:
-                    continue
-
-                # means one dependency is build and test, for example
-                # see https://formulae.brew.sh/api/formula/abook.json for example
-                # gettext is both a build and runtime dependency
-                if name in processed:
-                    continue
-
-                dependency = self.caches.package_map.get(name)
-
-                # guard: no dependency
-                if not dependency:
-                    # TODO: handle this case, though it fixes itself on the next run
-                    self.logger.warn(f"{name}, dep of {pkg.formula} is new")
-                    continue
-
-                actual.add((dependency.id, dep_type))
-                processed.add(name)
-
-        # alright, let's do it
-        if hasattr(pkg, "dependencies"):
-            process(pkg.dependencies, self.config.dependency_types.runtime)
-        if hasattr(pkg, "build_dependencies"):
-            process(pkg.build_dependencies, self.config.dependency_types.build)
-        if hasattr(pkg, "test_dependencies"):
-            process(pkg.test_dependencies, self.config.dependency_types.test)
-        if hasattr(pkg, "recommended_dependencies"):
-            process(
-                pkg.recommended_dependencies, self.config.dependency_types.recommended
-            )
-        if hasattr(pkg, "optional_dependencies"):
-            process(pkg.optional_dependencies, self.config.dependency_types.optional)
-
-        # get the package ID for what we are working with
-        package = self.caches.package_map.get(pkg.formula)
-        if not package:
-            # TODO: handle this case, though it fixes itself on the next run
-            self.logger.warn(f"New package {pkg.formula}, will grab its deps next time")
-            return [], []
-
-        pkg_id: UUID = package.id
-
-        # now, we need to figure out what's new / removed
-        # we need:
-        # 1. something in that same structure as `actual`, to track what's in CHAI
-        existing: set[tuple[UUID, UUID]] = set()
-        # 2. set of LegacyDependency objects
-        legacy_links: set[LegacyDependency] = self.caches.dependencies.get(
-            pkg_id, set()
+        normalized = normalize_homebrew_package(pkg)
+        return diff_dependencies(
+            normalized,
+            self.caches,
+            self.config.dependency_types,
+            now=self.now,
         )
-        # 3. easy look up to get to legacy_links to go from 1 to 2
-        existing_legacy_map: dict[tuple[UUID, UUID], LegacyDependency] = {}
-
-        for legacy in legacy_links:
-            key = (legacy.dependency_id, legacy.dependency_type_id)
-            existing_legacy_map[key] = legacy
-            existing.add(key)
-
-        # calculate our diffs
-        added_tuples: set[tuple[UUID, UUID]] = actual - existing
-        removed_tuples: set[tuple[UUID, UUID]] = existing - actual
-
-        # convert these to LegacyDependency objects
-        for dep_id, type_id in added_tuples:
-            new_dep = LegacyDependency(
-                package_id=pkg_id,
-                dependency_id=dep_id,
-                dependency_type_id=type_id,
-                created_at=self.now,
-                updated_at=self.now,
-            )
-            new_deps.append(new_dep)
-
-        for dep_id, type_id in removed_tuples:
-            removed_dep = existing_legacy_map.get((dep_id, type_id))
-            if removed_dep:
-                removed_deps.append(removed_dep)
-
-        return new_deps, removed_deps

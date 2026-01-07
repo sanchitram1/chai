@@ -4,11 +4,13 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.config import Config
+from core.diff import diff_dependencies
 from core.logger import Logger
 from core.models import URL, LegacyDependency, Package, PackageURL
 from core.structs import Cache, URLKey
 from package_managers.pkgx.db import DB
-from package_managers.pkgx.parser import DependencyBlock, PkgxPackage
+from package_managers.pkgx.normalizer import normalize_pkgx_package
+from package_managers.pkgx.parser import PkgxPackage
 from package_managers.pkgx.url import generate_chai_urls
 
 
@@ -137,136 +139,18 @@ class PkgxDiff:
         """
         Takes in a pkgx package and figures out what dependencies have changed.
 
-        The process is:
-           1. Build a view of what the package's dependencies are according to
-              the parsed pkgx data, using priority-based deduplication
-           2. Get this package's ID from CHAI
-           3. Get this package's existing dependencies from CHAI
-           4. Compare the two sets, and identify new and removed dependencies
-
-        Note: The database has a unique constraint on (package_id, dependency_id),
-        so if a package depends on the same dependency with multiple types (e.g.,
-        both runtime and build), we choose the highest priority type:
-        Runtime > Build > Test
+        Uses the normalized dependency diffing approach:
+        1. Normalize the package to a NormalizedPackage
+        2. Use shared diff_dependencies() for the core algorithm
 
         Returns:
           - new_deps: a list of new dependencies
           - removed_deps: a list of removed dependencies
         """
-        new_deps: list[LegacyDependency] = []
-        removed_deps: list[LegacyDependency] = []
-
-        # First, collect all dependencies and deduplicate by dependency name
-        # choosing the highest priority dependency type for each unique dependency
-        dependency_map: dict[str, UUID] = {}
-
-        # Priority order: Runtime > Build > Test
-        priority_order = {
-            self.config.dependency_types.runtime: 1,
-            self.config.dependency_types.build: 2,
-            self.config.dependency_types.test: 3,
-        }
-
-        def process_deps(dependencies: list[DependencyBlock], dep_type: UUID) -> None:
-            """Helper to process dependencies of a given type with priority"""
-            for dep in dependencies:
-                for dep_obj in dep.dependencies:
-                    if not dep_obj.name:
-                        continue
-
-                    # Get the dependency package from cache
-                    dependency = self.caches.package_map.get(dep_obj.name)
-                    if not dependency:
-                        self.logger.warn(
-                            f"{dep_obj.name}, dep of {import_id} is not in cache"
-                        )
-                        continue
-
-                    # If this dependency already exists in our map, choose higher priority
-                    if dep_obj.name in dependency_map:
-                        existing_priority = priority_order.get(
-                            dependency_map[dep_obj.name], 999
-                        )
-                        new_priority = priority_order.get(dep_type, 999)
-
-                        if (
-                            new_priority < existing_priority
-                        ):  # Lower number = higher priority
-                            old_type_id = dependency_map[dep_obj.name]
-                            dependency_map[dep_obj.name] = dep_type
-                            self.logger.debug(
-                                f"Updated dependency type for {dep_obj.name} from "
-                                f"{old_type_id} to {dep_type} (higher priority)"
-                            )
-                    else:
-                        dependency_map[dep_obj.name] = dep_type
-
-        # Process different types of dependencies with priority handling
-        process_deps(pkg.dependencies, self.config.dependency_types.runtime)
-        process_deps(pkg.build.dependencies, self.config.dependency_types.build)
-        process_deps(pkg.test.dependencies, self.config.dependency_types.test)
-
-        # Now build the actual set of dependencies with resolved types
-        actual: set[tuple[UUID, UUID]] = set()
-        for dep_name, dep_type in dependency_map.items():
-            dependency = self.caches.package_map.get(dep_name)
-            if dependency:  # Double-check it still exists
-                actual.add((dependency.id, dep_type))
-
-        # get the package ID for what we are working with
-        package = self.caches.package_map.get(import_id)
-        if not package:
-            self.logger.warn(f"New package {import_id}, will grab its deps next time")
-            return [], []
-
-        pkg_id: UUID = package.id
-
-        # what are its existing dependencies?
-        # specifically, existing dependencies IN THE SAME STRUCTURE as `actual`,
-        # so we can do an easy comparison
-        existing: set[tuple[UUID, UUID]] = {
-            (dep.dependency_id, dep.dependency_type_id)
-            for dep in self.caches.dependencies.get(pkg_id, set())
-        }
-
-        # we have two sets!
-        # actual minus existing = new_deps
-        # existing minus actual = removed_deps
-        new = actual - existing
-        removed = existing - actual
-
-        new_deps: list[LegacyDependency] = [
-            LegacyDependency(
-                package_id=pkg_id,
-                dependency_id=dep[0],
-                dependency_type_id=dep[1],
-                created_at=self.now,
-                updated_at=self.now,
-            )
-            for dep in new
-        ]
-
-        # get the existing legacy dependency, and add it to removed_deps
-        removed_deps: list[LegacyDependency] = []
-        cache_deps: set[LegacyDependency] = self.caches.dependencies.get(pkg_id, set())
-        for removed_dep_id, removed_dep_type in removed:
-            try:
-                existing_dep = next(
-                    dep
-                    for dep in cache_deps
-                    if dep.dependency_id == removed_dep_id
-                    and dep.dependency_type_id == removed_dep_type
-                )
-                removed_deps.append(existing_dep)
-            except StopIteration as exc:
-                cache_deps_str = "\n".join(
-                    [
-                        f"{dep.dependency_id} / {dep.dependency_type_id}"
-                        for dep in cache_deps
-                    ]
-                )
-                raise ValueError(
-                    f"Removing {removed_dep_id} / {removed_dep_type} for {pkg_id} but not in Cache: \n{cache_deps_str}"
-                ) from exc
-
-        return new_deps, removed_deps
+        normalized = normalize_pkgx_package(import_id, pkg)
+        return diff_dependencies(
+            normalized,
+            self.caches,
+            self.config.dependency_types,
+            now=self.now,
+        )

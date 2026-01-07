@@ -38,40 +38,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup with pkgx
-        uses: pkgxdev/setup@v4
-        with:
-          +: astral.sh/uv
-            astral.sh/ruff
-            pytest.org
+      - name: Install uv 
+        uses: astral-sh/setup-uv@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version-file: ".python-version"
+        run: uv python install
 
-      - name: Install the project
-        run: pkgx uv sync --locked --all-extras --dev --all-groups
+      - name: Install dependencies
+        run: uv sync --all-extras --dev --all-groups
+      
+      - name: Install packages in editable mode
+        run: uv pip install -e .
 
-      - name: Lint with Ruff
-        uses: astral-sh/ruff-action@v3
-        with:
-          src: .
+      - name: Check formatting
+        run: uv run ruff format --check .
 
-      - name: Run tests with pytest
-        id: pytest
-        run: |
-          pkgx uv run pytest tests/
+      - name: Lint
+        run: uv run ruff check .
 
-  complain:
-    needs: check
-    if: failure()
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/complain
-        with:
-          test_function: "pytest"
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run tests
+        run: uv run pytest -v
+        env:
+          PYTHONPATH: .
+
+  # complain:
+  #   needs: check
+  #   if: failure()
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     issues: write
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - uses: ./.github/actions/complain
+  #       with:
+  #         test_function: "pytest"
+  #         token: ${{ secrets.GITHUB_TOKEN }}

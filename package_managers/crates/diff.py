@@ -2,10 +2,12 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from core.config import Config
+from core.diff import diff_dependencies
 from core.logger import Logger
 from core.models import URL, LegacyDependency, Package, PackageURL
 from core.structs import Cache, URLKey
-from package_managers.crates.structs import Crate, DependencyType
+from package_managers.crates.normalizer import normalize_crates_package
+from package_managers.crates.structs import Crate
 
 
 class Diff:
@@ -162,162 +164,20 @@ class Diff:
         self, pkg: Crate
     ) -> tuple[list[LegacyDependency], list[LegacyDependency]]:
         """
-        Identifies new and removed dependencies for a given crate
+        Identifies new and removed dependencies for a given crate.
 
-        The process is:
-           1. Build a view of what the package's dependencies are according to
-              the crates.io database.
-           2. Get this crate's Package ID from CHAI
-           3. Get this crate's existing dependencies from CHAI
-           4. Compare the two sets, and identify new and removed dependencies
-
-        Note: The database has a unique constraint on (package_id, dependency_id),
-        so if a package depends on the same dependency with multiple types (e.g.,
-        both runtime and build), we choose the highest priority type:
-        NORMAL (runtime) > BUILD > DEV
+        Uses the normalized dependency diffing approach:
+        1. Normalize the crate to a NormalizedPackage
+        2. Use shared diff_dependencies() for the core algorithm
 
         Returns:
             new_deps: list[LegacyDependency], the new dependencies
             removed_deps: list[LegacyDependency], the removed dependencies
         """
-        new_deps: list[LegacyDependency] = []
-        removed_deps: list[LegacyDependency] = []
-
-        # First, collect all dependencies and deduplicate by (package_id, dependency_id)
-        # choosing the highest priority dependency type for each unique dependency
-        dependency_map: dict[UUID, DependencyType] = {}
-
-        # Priority order: NORMAL (runtime) > BUILD > DEV
-        priority_order = {
-            DependencyType.NORMAL: 1,
-            DependencyType.BUILD: 2,
-            DependencyType.DEV: 3,
-        }
-
-        # Build the map of dependencies, keeping only the highest priority type
-        if pkg.latest_version:
-            for dependency in pkg.latest_version.dependencies:
-                dep_crate_id: str = str(dependency.dependency_id)
-                dep_type: DependencyType = dependency.dependency_type
-
-                # guard: no dep_id
-                if not dep_crate_id:
-                    raise ValueError(f"No dep_id for {dependency}")
-
-                # guard: no dep_type
-                if dep_type is None:
-                    raise ValueError(f"No dep_type for {dependency}")
-
-                # get the ID from the cache
-                dependency_pkg = self.caches.package_map.get(dep_crate_id)
-
-                # if we don't have the dependency, skip it for now
-                if not dependency_pkg:
-                    self.logger.debug(
-                        f"{dep_crate_id}, dependency of {pkg.name} is new"
-                    )
-                    continue
-
-                dependency_id = dependency_pkg.id
-
-                # If this dependency already exists in our map, choose higher priority
-                if dependency_id in dependency_map:
-                    existing_priority = priority_order.get(
-                        dependency_map[dependency_id], 999
-                    )
-                    new_priority = priority_order.get(dep_type, 999)
-
-                    if (
-                        new_priority < existing_priority
-                    ):  # Lower number = higher priority
-                        old_type = dependency_map[dependency_id]
-                        dependency_map[dependency_id] = dep_type
-                        self.logger.debug(
-                            f"Updated dependency type for {dep_crate_id} from "
-                            f"{old_type} to {dep_type} (higher priority)"
-                        )
-                else:
-                    dependency_map[dependency_id] = dep_type
-
-        # Now build the actual set of dependencies with resolved types
-        actual: set[tuple[UUID, UUID]] = set()
-        for dependency_id, dep_type in dependency_map.items():
-            # figure out the dependency type UUID
-            dependency_type = self._resolve_dep_type(dep_type)
-            # add it to the set of actual dependencies
-            actual.add((dependency_id, dependency_type))
-
-        # establish the package that we are working with
-        crate_id: str = str(pkg.id)
-        package = self.caches.package_map.get(crate_id)
-        if not package:
-            # TODO: handle this case, though it fixes itself on the next run
-            self.logger.debug(f"New package {pkg.name}, will grab its deps next time")
-            return [], []
-
-        pkg_id: UUID = package.id
-
-        # what are its existing dependencies?
-        # specifically, existing dependencies IN THE SAME STRUCTURE as `actual`,
-        # so we can do an easy comparison
-        existing: set[tuple[UUID, UUID]] = {
-            (dep.dependency_id, dep.dependency_type_id)
-            for dep in self.caches.dependencies.get(pkg_id, set())
-        }
-
-        # we have two sets!
-        # actual minus existing = new_deps
-        # existing minus actual = removed_deps
-        new = actual - existing
-        removed = existing - actual
-
-        new_deps: list[LegacyDependency] = [
-            LegacyDependency(
-                # don't include the ID because it's a sequence for this table
-                package_id=pkg_id,
-                dependency_id=dep[0],
-                dependency_type_id=dep[1],
-                created_at=self.now,
-                updated_at=self.now,
-            )
-            for dep in new
-        ]
-
-        # get the existing legacy dependency, and add it to removed_deps
-        removed_deps: list[LegacyDependency] = []
-        cache_deps: set[LegacyDependency] = self.caches.dependencies.get(pkg_id, set())
-        for removed_dep_id, removed_dep_type in removed:
-            try:
-                existing_dep = next(
-                    dep
-                    for dep in cache_deps
-                    if dep.dependency_id == removed_dep_id
-                    and dep.dependency_type_id == removed_dep_type
-                )
-
-                removed_deps.append(existing_dep)
-            except StopIteration as exc:
-                cache_deps_str = "\n".join(
-                    [
-                        f"{dep.dependency_id} / {dep.dependency_type_id}"
-                        for dep in cache_deps
-                    ]
-                )
-                raise ValueError(
-                    f"Removing {removed_dep_id} / {removed_dep_type} for {pkg_id} but not in Cache: \n{cache_deps_str}"
-                ) from exc
-
-        return new_deps, removed_deps
-
-    def _resolve_dep_type(self, dep_type: DependencyType) -> UUID:
-        """
-        Resolves the dependency type UUID from the config
-        """
-        if dep_type == DependencyType.NORMAL:
-            return self.config.dependency_types.runtime
-        elif dep_type == DependencyType.BUILD:
-            return self.config.dependency_types.build
-        elif dep_type == DependencyType.DEV:
-            return self.config.dependency_types.development
-        else:
-            raise ValueError(f"Unknown dependency type: {dep_type}")
+        normalized = normalize_crates_package(pkg)
+        return diff_dependencies(
+            normalized,
+            self.caches,
+            self.config.dependency_types,
+            now=self.now,
+        )
