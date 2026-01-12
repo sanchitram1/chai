@@ -87,7 +87,9 @@ def load_graph(
             break
 
         if i % 1000 == 0:
-            logger.debug(f"Processing package {i+1}/{len(packages)} (ID: {package.id})")
+            logger.debug(
+                f"Processing package {i + 1}/{len(packages)} (ID: {package.id})"
+            )
 
     logger.log(f"Missing {len(missing)} packages")
     # TODO: should we save the missing packages?

@@ -68,6 +68,7 @@ def diff(
     # Keeps track of all the new packages we're adding
     seen: dict[str, UUID] = {}
     seen_new_pkg_urls: set[tuple[UUID, UUID]] = set()
+    seen_new_deps: set[tuple[UUID, UUID]] = set()
 
     # Objects that we will return
     new_packages: list[Package] = []
@@ -125,7 +126,13 @@ def diff(
         new_dependencies, removed_dependencies = diff.diff_deps(import_id, debian_data)
         if new_dependencies:
             logger.debug(f"New dependencies: {len(new_dependencies)}")
-            new_deps.extend(new_dependencies)
+
+            # guard: only add truly new dependencies
+            for dep in new_dependencies:
+                if (dep.package_id, dep.dependency_id) not in seen_new_deps:
+                    new_deps.append(dep)
+                    seen_new_deps.add((dep.package_id, dep.dependency_id))
+
         if removed_dependencies:
             logger.debug(f"Removed dependencies: {len(removed_dependencies)}")
             removed_deps.extend(removed_dependencies)

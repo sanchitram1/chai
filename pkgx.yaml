@@ -1,10 +1,10 @@
 # this is the pkgx config across all the services covered by docker-compose
 dependencies:
-  python.org: ~3.11
-  xcfile.dev: 0
-  cli.github.com: 2
-  astral.sh/uv: 0
-  postgresql.org: 16
-  docker.com/compose: 2
-  alembic.sqlalchemy.org: 1
-  psycopg.org/psycopg2: 2
+  xcfile.dev: ^0
+  cli.github.com: ^2
+  astral.sh/uv: ^0
+  postgresql.org: ^16
+  docker.com/compose: ^2
+  alembic.sqlalchemy.org: ^1
+  psycopg.org/psycopg2: ^2
+  python.org: ^3.11

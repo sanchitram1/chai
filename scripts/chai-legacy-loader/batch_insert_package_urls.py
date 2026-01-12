@@ -134,12 +134,12 @@ def load_url_id_cache_from_file(
                             )
                     except ValueError as ve:
                         logger.warn(
-                            f"Invalid UUID in URL cache file at row {i+2}: {row} - {ve}"
+                            f"Invalid UUID in URL cache file at row {i + 2}: {row} - {ve}"
                         )
                         continue
                 else:
                     logger.warn(
-                        f"Skipping malformed row in URL cache file at row {i+2}: {row}"
+                        f"Skipping malformed row in URL cache file at row {i + 2}: {row}"
                     )
         logger.log(f"Loaded {len(cache)} URLs into url_id cache from file.")
         return cache
